@@ -3,12 +3,13 @@ from time import sleep
 import datetime
 from threading import Thread
 from typing import List
-from components.routine_summary import routine_summary
 
-tickers = ['AXP', 'v', 'PG', 'HD', 'NKE']
+
+tickers = ['AXP', 'V', 'PG', 'HD', 'NKE']
 check_period = 4
 wait_time = 5
 reserve = 200000
+
 
 def sell_market(trader: shift.Trader, symbol: str, amount: int):
     order = shift.Order(shift.Order.MARKET_SELL, symbol, amount)
@@ -147,7 +148,7 @@ def start_threads(trader: shift.Trader, till: datetime.datetime) -> List[Thread]
         threads.append(Thread(target=trade_shorts, args=(symbol, trader, till)))
         threads.append(Thread(target=trade_longs, args=(symbol, trader, till)))
         threads.append(Thread(target=process_unrealized_gains, args=(symbol, trader, till)))
-    threads.append(Thread(target=routine_summary, args=(trader, till)))
+    #threads.append(Thread(target=routine_summary, args=(trader, till)))
     for thread in threads:
         thread.start()
     return threads
