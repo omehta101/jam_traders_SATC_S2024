@@ -66,7 +66,7 @@ def main(trader):
    
     check_frequency = 60 
     current = trader.get_last_trade_time()
-    start_time = datetime.combine(current, dt.time(9,33,0))
+    start_time = datetime.combine(current, dt.time(9,30,0))
     end_time = datetime.combine(current, dt.time(10,00,0))
 
     while trader.get_last_trade_time() < start_time:
@@ -87,6 +87,7 @@ def main(trader):
            'CVX']
 
     print("START")
+    print(trader.get_last_trade_time())
 
     for ticker in tickers:
         # initializes threads containing the strategy for each ticker
