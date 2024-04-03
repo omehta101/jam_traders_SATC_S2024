@@ -46,7 +46,7 @@ def cover_shorts(trader: shift.Trader, ticker: str):
         orders = place_orders(shift.Order.MARKET_BUY, ticker, int(item.get_short_shares/100))
         sleep(10)
         item = trader.get_portfolio_item(ticker)
-        print(f'Covering {ticker} short at {get_prices(trader, ticker)[0]} for {'profit' if individual_upl(trader, ticker, 'short') > 0 else 'loss'}')
+        print(f"Covering {ticker} short at {get_prices(trader, ticker)[0]} for {'profit' if individual_upl(trader, ticker, 'short') > 0 else 'loss'}")
 
 def strategy(trader: shift.Trader, ticker: str, endtime):
 
