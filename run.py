@@ -61,13 +61,14 @@ def strategy(trader: shift.Trader, ticker: str, endtime):
 
         order = shift.Order(shift.Order.Type.MARKET_SELL, ticker, order_size)
         trader.submit_order(order)
+        print(f"shorted {ticker} at {trader.get_last_trade_time()}")
 
 def main(trader):
    
     check_frequency = 60 
     current = trader.get_last_trade_time()
     start_time = datetime.combine(current, dt.time(10,00,0))
-    end_time = datetime.combine(current, dt.time(15,30,0))
+    end_time = datetime.combine(current, dt.time(10,30,0))
 
     while trader.get_last_trade_time() < start_time:
 
