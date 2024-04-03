@@ -4,9 +4,6 @@ from datetime import datetime, timedelta
 import datetime as dt
 from threading import Thread
 
-# NOTE: for documentation on the different classes and methods used to interact with the SHIFT system, 
-# see: https://github.com/hanlonlab/shift-python/wiki
-
 def cancel_orders(trader, ticker):
     # cancel all the remaining orders
     for order in trader.get_waiting_list():
@@ -14,114 +11,80 @@ def cancel_orders(trader, ticker):
             trader.submit_cancellation(order)
             sleep(1)  # the order cancellation needs a little time to go through
 
+def get_prices(trader: shift.Trader, ticker: str):
 
-def close_positions(trader, ticker):
-    # NOTE: The following orders may not go through if:
-    # 1. You do not have enough buying power to close your short postions. Your strategy should be formulated to ensure this does not happen.
-    # 2. There is not enough liquidity in the market to close your entire position at once. You can avoid this either by formulating your
-    #    strategy to maintain a small position, or by modifying this function to close ur positions in batches of smaller orders.
+    best_prices = trader.get_best_price(ticker)
+    bid = best_prices.get_bid_price()
+    ask = best_prices.get_ask_price()
+    mid = (ask+bid)/2
+    return [ask, bid, mid]
 
-    # close all positions for given ticker
-    print(f"running close positions function for {ticker}")
+def place_orders(order_type: shift.Order.Type, ticker: str, size: int):
+
+    order = shift.Order(order_type, ticker, size)
+    trader.submit_order(order)
+    return [order]
+
+def individual_upl(trader: shift.Trader, ticker: str, type: str):
+
+    price = trader.get_last_price()
+    item = trader.get_portfolio_item(ticker)
+    curr_long_val, curr_short_val = item.get_long_shares() * price, item.get_short_shares() * price
+    cost_long, cost_short = item.get_long_price() * price, item.get_short_price() * price
+    short_pl = curr_short_val - cost_short
+    long_pl = curr_long_val - cost_long
+
+    if type == 'short':
+        return short_pl
+    else: return long_pl
+
+def cover_shorts(trader: shift.Trader, ticker: str):
 
     item = trader.get_portfolio_item(ticker)
-
-    # close any long positions
-    long_shares = item.get_long_shares()
-    if long_shares > 0:
-        print(f"market selling because {ticker} long shares = {long_shares}")
-        order = shift.Order(shift.Order.Type.MARKET_SELL,
-                            ticker, int(long_shares/100))  # we divide by 100 because orders are placed for lots of 100 shares
-        trader.submit_order(order)
-        sleep(1)  # we sleep to give time for the order to process
-
-    # close any short positions
-    short_shares = item.get_short_shares()
-    if short_shares > 0:
-        print(f"market buying because {ticker} short shares = {short_shares}")
-        order = shift.Order(shift.Order.Type.MARKET_BUY,
-                            ticker, int(short_shares/100))
-        trader.submit_order(order)
-        sleep(1)
-
+    
+    while item.get_short_shares() > 0:
+        orders = place_orders(shift.Order.MARKET_BUY, ticker, int(item.get_short_shares/100))
+        sleep(10)
+        item = trader.get_portfolio_item(ticker)
+        print(f'Covering {ticker} short at {get_prices(trader, ticker)[0]} for {'profit' if individual_upl(trader, ticker, 'short') > 0 else 'loss'}')
 
 def strategy(trader: shift.Trader, ticker: str, endtime):
-    # NOTE: Unlike the following sample strategy, it is highly reccomended that you track and account for your buying power and
-    # position sizes throughout your algorithm to ensure both that have adequite captial to trade throughout the simulation and
-    # that you are able to close your position at the end of the strategy without incurring major losses.
 
-    initial_pl = trader.get_portfolio_item(ticker).get_realized_pl()
-
-    # strategy parameters
     check_freq = 1
-    order_size = 5  # NOTE: this is 5 lots which is 500 shares.
+    order_size = 4
 
-    # strategy variables
-    best_price = trader.get_best_price(ticker)
-    best_bid = best_price.get_bid_price()
-    best_ask = best_price.get_ask_price()
-    previous_price = (best_bid + best_ask) / 2
+    while trader.get_last_trade_time() < endtime:
+        ask, bid, mid = get_prices(trader, ticker)
 
-    while (trader.get_last_trade_time() < endtime):
-        # cancel unfilled orders from previous time-step
-        cancel_orders(trader, ticker)
+        if bid == 0 or ask == 0:
+            continue 
 
-        # get necessary data
-        best_price = trader.get_best_price(ticker)
-        best_bid = best_price.get_bid_price()
-        best_ask = best_price.get_ask_price()
-        midprice = (best_bid + best_ask) / 2
-
-        # place order
-        if (midprice > previous_price):  # price has increased since last timestep
-            # we predict price will continue to go up
-            order = shift.Order(
-                shift.Order.Type.MARKET_BUY, ticker, order_size)
-            trader.submit_order(order)
-        elif (midprice < previous_price):  # price has decreased since last timestep
-            # we predict price will continue to go down
-            order = shift.Order(
-                shift.Order.Type.MARKET_SELL, ticker, order_size)
-            trader.submit_order(order)
-
-            # NOTE: If you place a sell order larger than your current long position, it will result in a short sale, which
-            # requires buying power both for the initial short_sale and to close your short position.For example, if we short
-            # sell 1 lot of a stock trading at $100, it will consume 100*100 = $10000 of our buying power. Then, in order to
-            # close that position, assuming the price has not changed, it will require another $10000 of buying power, after
-            # which our pre short-sale buying power will be restored, minus any transaction costs. Therefore, it requires
-            # double the buying power to open and close a short position than a long position.
-
-        previous_price = midprice
-        sleep(check_freq)
-
-    # cancel unfilled orders and close positions for this ticker
-    cancel_orders(trader, ticker)
-    close_positions(trader, ticker)
-
-    print(
-        f"total profits/losses for {ticker}: {trader.get_portfolio_item(ticker).get_realized_pl() - initial_pl}")
-
+        order = shift.Order(shift.Order.Type.MARKET_SELL, ticker, order_size)
+        trader.submit_order(order)
 
 def main(trader):
-    # keeps track of times for the simulation
-    check_frequency = 60
+   
+    check_frequency = 60 
     current = trader.get_last_trade_time()
-    # start_time = datetime.combine(current, dt.time(9, 30, 0))
-    # end_time = datetime.combine(current, dt.time(15, 50, 0))
-    start_time = current
-    end_time = start_time + timedelta(minutes=1)
+    start_time = datetime.combine(current, dt.time(9,33,0))
+    end_time = datetime.combine(current, dt.time(10,00,0))
 
     while trader.get_last_trade_time() < start_time:
-        print("still waiting for market open")
+
+        print(f"Awaiting market open at {trader.get_last_trade_time()}")
         sleep(check_frequency)
 
-    # we track our overall initial profits/losses value to see how our strategy affects it
     initial_pl = trader.get_portfolio_summary().get_total_realized_pl()
 
     threads = []
 
     # in this example, we simultaneously and independantly run our trading alogirthm on two tickers
-    tickers = ["AAPL", "MSFT"]
+    tickers = ['VZ',
+           'XOM',
+           'MMM',
+           'IBM',
+           'JNJ',
+           'CVX']
 
     print("START")
 
@@ -147,7 +110,7 @@ def main(trader):
     # make sure all remaining orders have been cancelled and all positions have been closed
     for ticker in tickers:
         cancel_orders(trader, ticker)
-        close_positions(trader, ticker)
+        cover_shorts(trader, ticker)
 
     print("END")
     print(f"final bp: {trader.get_portfolio_summary().get_total_bp()}")
@@ -156,7 +119,7 @@ def main(trader):
 
 
 if __name__ == '__main__':
-    with shift.Trader("jam_traders_test002") as trader:
+    with shift.Trader("jam_traders_test004") as trader:
         trader.connect("initiator.cfg", "mNifF1Kq")
         sleep(1)
         trader.sub_all_order_book()
