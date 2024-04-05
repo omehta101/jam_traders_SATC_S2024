@@ -25,35 +25,36 @@ def place_orders(order_type: shift.Order.Type, ticker: str, size: int):
     trader.submit_order(order)
     return [order]
 
-def individual_upl(trader: shift.Trader, ticker: str, type: str):
+def individual_upl(trader: shift.Trader, ticker: str):
 
-    price = trader.get_last_price()
+    price = get_prices(trader, ticker)[2]
     item = trader.get_portfolio_item(ticker)
-    curr_long_val, curr_short_val = item.get_long_shares() * price, item.get_short_shares() * price
-    cost_long, cost_short = item.get_long_price() * price, item.get_short_price() * price
-    short_pl = curr_short_val - cost_short
-    long_pl = curr_long_val - cost_long
+    short_shares = item.get_short_shares()
+    short_val = short_shares * price
+    cost = item.get_short_price() * short_shares
+    return short_val - cost
 
-    if type == 'short':
-        return short_pl
-    else: return long_pl
 
 def cover_shorts(trader: shift.Trader, ticker: str):
 
     item = trader.get_portfolio_item(ticker)
     
     while item.get_short_shares() > 0:
-        orders = place_orders(shift.Order.MARKET_BUY, ticker, int(item.get_short_shares/100))
+        orders = place_orders(shift.Order.MARKET_BUY, ticker, int(item.get_short_shares()/100))
         sleep(10)
         item = trader.get_portfolio_item(ticker)
-        print(f"Covering {ticker} short at {get_prices(trader, ticker)[0]} for {individual_upl(trader, ticker, 'short')} P&L")
+        print(f"Covering {ticker} short at {get_prices(trader, ticker)[0]} for {individual_upl(trader, ticker)} P&L at {trader.get_last_trade_time()}")
 
 def strategy(trader: shift.Trader, ticker: str, endtime):
 
-    check_freq = 1
-    order_size = 4
+    check_freq = 30
+    order_size = 2
+    item = trader.get_portfolio_item(ticker)
+    acceptable_trade = trader.get_portfolio_summary().get_total_bp()*0.6 > get_prices(trader, ticker)[1]*200
+    orders = 0
 
-    while trader.get_last_trade_time() < endtime:
+    while trader.get_last_trade_time() < endtime and acceptable_trade and orders <= 35:
+        sleep(30)
         ask, bid, mid = get_prices(trader, ticker)
 
         if bid == 0 or ask == 0:
@@ -61,25 +62,28 @@ def strategy(trader: shift.Trader, ticker: str, endtime):
 
         order = shift.Order(shift.Order.Type.MARKET_SELL, ticker, order_size)
         trader.submit_order(order)
-        print(f"shorted {ticker} at {trader.get_last_trade_time()}")
+        orders += 1
+        print(f"shorted {order_size*100} shares of {ticker} at {trader.get_last_trade_time()} at {bid}")
+        item = trader.get_portfolio_item(ticker)
+
+   
 
 def main(trader):
    
     check_frequency = 60 
     current = trader.get_last_trade_time()
-    start_time = datetime.combine(current, dt.time(10,00,0))
-    end_time = datetime.combine(current, dt.time(10,30,0))
+    start_time = datetime.combine(current, dt.time(10,00,00))
+    end_time = datetime.combine(current, dt.time(15,30,00))
 
     while trader.get_last_trade_time() < start_time:
 
         print(f"Awaiting market open at {trader.get_last_trade_time()}")
-        sleep(check_frequency)
+        sleep(3)
 
     initial_pl = trader.get_portfolio_summary().get_total_realized_pl()
 
     threads = []
 
-    # in this example, we simultaneously and independantly run our trading alogirthm on two tickers
     tickers = ['VZ',
            'XOM',
            'MMM',
@@ -88,6 +92,7 @@ def main(trader):
            'CVX']
 
     print("START")
+    sleep(2)
     print(trader.get_last_trade_time())
 
     for ticker in tickers:
@@ -97,11 +102,11 @@ def main(trader):
 
     for thread in threads:
         thread.start()
-        sleep(1)
+        sleep(3)
 
     # wait until endtime is reached
     while trader.get_last_trade_time() < end_time:
-        sleep(check_frequency)
+        sleep(check_frequency) 
 
     # wait for all threads to finish
     for thread in threads:
@@ -121,7 +126,7 @@ def main(trader):
 
 
 if __name__ == '__main__':
-    with shift.Trader("jam_traders_test004") as trader:
+    with shift.Trader("jam_traders") as trader:
         trader.connect("initiator.cfg", "mNifF1Kq")
         sleep(1)
         trader.sub_all_order_book()
