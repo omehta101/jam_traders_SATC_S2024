@@ -90,7 +90,7 @@ def mm_short(trader: shift.Trader, ticker: str, end_time):
 
         if allocation > current_port_val:
             
-            lots = 4
+            lots = 3
             price = ask
 
             if spread < min_spread:
@@ -123,7 +123,7 @@ def mm_long(trader: shift.Trader, ticker: str, end_time):
 
         if allocation > current_port_val:
             
-            lots = 4
+            lots = 3
             price = ask
 
             if spread < min_spread:
@@ -230,7 +230,7 @@ def main(trader):
             print(f'CLOSING LONG {ticker}')
             sell_long(trader, ticker)
             sleep(1)
-    sleep(5) # change this to sleep 10 for real
+    sleep(10) # change this to sleep 10 for real
 
     for ticker in tickers:
         item = trader.get_portfolio_item(ticker)
@@ -238,7 +238,7 @@ def main(trader):
             print(f'CLOSING SHORT {ticker}')
             cover_shorts(trader, ticker)
             sleep(1)
-    sleep(5) # change this to sleep 10 for real
+    sleep(10)
 
     print("END")
     print(f"final bp: {trader.get_portfolio_summary().get_total_bp()}")
