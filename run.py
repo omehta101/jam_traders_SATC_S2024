@@ -90,7 +90,7 @@ def mm_short(trader: shift.Trader, ticker: str, end_time):
 
         if allocation > current_port_val:
             
-            lots = 3
+            lots = 4
             price = ask
 
             if spread < min_spread:
@@ -123,7 +123,7 @@ def mm_long(trader: shift.Trader, ticker: str, end_time):
 
         if allocation > current_port_val:
             
-            lots = 3
+            lots = 4
             price = ask
 
             if spread < min_spread:
@@ -164,7 +164,7 @@ def manage_inventory(trader: shift.Trader, ticker: str, end_time):
         upl = unrealized_pl(trader, ticker)
         item = trader.get_portfolio_item(ticker)
         print(f"UPL {ticker} = {upl}")
-        if upl >= 0.004 or upl <= -0.003:
+        if upl >= 0.004 or upl <= -0.002:
             print(f"Closing positions on {ticker} for {upl} {'loss' if upl <= -0.002 else 'profit'}")
             if item.get_long_shares() > 0:
                 sell_long(trader, ticker)
@@ -173,10 +173,10 @@ def manage_inventory(trader: shift.Trader, ticker: str, end_time):
 
 def main(trader):
 
-    check_frequency = 60 
+    check_frequency = 60
     current = trader.get_last_trade_time()
-    start_time = datetime.combine(current, dt.time(10,00,00))
-    end_time = datetime.combine(current, dt.time(15,15,00))
+    start_time = datetime.combine(current, dt.time(9,45,00))
+    end_time = datetime.combine(current, dt.time(15,45,00))
 
     while trader.get_last_trade_time() < start_time:
 
